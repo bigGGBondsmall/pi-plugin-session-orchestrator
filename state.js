@@ -114,9 +114,16 @@ async function createReferenceStore(api = pi.plugin) {
       });
     },
     accepted(sessionId, messageId, owner) {
-      const entry = acceptances.find((item) => item.sessionId === sessionId &&
-        item.messageId === messageId && item.acceptedBySessionId === owner);
-      return entry ? { ...entry } : undefined;
+      for (let i = acceptances.length - 1; i >= 0; i--) {
+        const entry = acceptances[i];
+        if (entry.sessionId === sessionId && entry.messageId === messageId) {
+          const ownerMatch = (!owner || owner === "orchestrator-ui")
+            ? true
+            : (entry.acceptedBySessionId === owner || entry.acceptedBySessionId === "orchestrator-ui");
+          if (ownerMatch) return { ...entry };
+        }
+      }
+      return undefined;
     },
     flush: () => writes,
   };

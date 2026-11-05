@@ -9,10 +9,10 @@ const rejectsCode = (code) => (error) => error.code === code;
 
 test("manifest and registration share the bounded reviewed tool schema", async (t) => {
   const h = await loadHarness(t);
-  assert.equal(manifest.version, "0.7.1");
+  assert.equal(manifest.version, "0.8.2");
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.id, "pi.session-orchestrator");
-  assert.deepEqual(manifest.permissions, ["agent.tool.register", "desktop.control", "models.list"]);
+  assert.deepEqual(manifest.permissions, ["agent.tool.register", "desktop.control", "models.list", "ui.view"]);
   const descriptor = manifest.contributes.agentTools[0];
   assert.deepEqual(h.registered.tool.schema, descriptor.schema);
   assert.equal(h.registered.tool.description, descriptor.description);
@@ -30,8 +30,10 @@ test("manifest and registration share the bounded reviewed tool schema", async (
   assert.match(manifest.engines.piDesktop, /^>=0\.14\.7/);
 
   assert.equal("ui" in manifest, false);
-  assert.equal("commands" in manifest.contributes, false);
-  assert.equal(h.registered.command, null);
+  assert.equal(manifest.contributes.views[0].id, "orchestrator");
+  assert.equal(manifest.contributes.commands[0].id, "session-orchestrator.open");
+  assert.equal(typeof manifest.contributes.commands[0].title, "string");
+  assert.equal(h.registered.command?.id, "session-orchestrator.open");
 });
 
 

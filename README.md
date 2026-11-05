@@ -16,11 +16,19 @@ notifications. The plugin does not infer success from assistant text.
 
 ## Quick start (how do I use it?)
 
-This plugin deliberately has **no panel, no command, and nothing to
-configure** after install. It works inside your existing Agent chat: the agent
-gains one tool, `SessionTask`, and decides to use it from your goal — **no
-special keyword is required**. Just describe what you want:
+### 1. 侧边栏控制面板（v0.8.2）
+点击右侧工作面板的 **会话编排器（workflow）** 图标，或执行命令 **会话编排器：打开控制面板**。
+- **真实监控**：显示运行、排队、等待授权、完成、失败、取消及中断状态；任务与报告预览读取宿主 `currentTask.text` 与 `result.text`，轮询保留原会话 `updatedAt` 不被 `observedAt` 覆盖；实时反映当前主会话 busy 忙碌状态；轮询不会清空追问草稿，后台轮询保留错误提示。
+- **新建 / 追问**：提交给当前 Agent 主会话，由它调用真实 `SessionTask`；模型选择遵守宿主委派设置。主会话忙碌或处于活跃轮次时实时禁用提交，操作失败保留草稿并报告错误。
+- **提交与执行分开**：面板收到主会话轮次回执只显示“已提交”，不声称子会话已创建；真实派发回执在主会话中查看，子任务状态随后出现在面板。
+- **按投递操作**：结果、中止和验收绑定明确 `messageId`，无 ID 时禁用；面板与 Agent 会话共享验收记录；中止/验收使用面板内确认框。支持打开目标会话。
+- **无模拟成功**：宿主桥接不可用时显示错误并禁用操作。读取失败不会伪装成空闲。
+- **本地版本提示**：市场更新可能覆盖本地修改，原版备份保留在 session scratch 的 `backup-orchestrator` 中。
 
+面板使用宿主正式 `agent/prompt` 入口提交用户点击的操作，不伪造 Agent 调用上下文，也不修改目标会话权限。主会话必须处于可接收新输入的 Agent 状态；切换会话后需刷新重新提交。超时或不明确的回执请先查看主会话，勿自动重复派发。
+
+### 2. Conversational Agent Tool
+It continues to work seamlessly inside your Agent chat: the agent has `SessionTask` to coordinate sessions via natural language:
 | You say (any language) | What happens |
 | --- | --- |
 | 开两个子会话，一个跑测试一个改文档 / "spawn two workers: one runs the tests, one updates the docs" | Two real sessions are created and start working in parallel |

@@ -80,6 +80,9 @@ export function makeHarness({ initialSettings, models } = {}) {
       register: async (command) => { registered.command = command; },
       unregister: async () => { registered.command = null; },
     },
+    ui: {
+      revealView: async (input) => { calls.push({ operation: "ui.revealView", args: [input] }); },
+    },
     agent: {
       registerTool: async (tool) => { registered.tool = tool; },
       unregisterTool: async () => { registered.tool = null; },

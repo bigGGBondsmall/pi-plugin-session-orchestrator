@@ -123,31 +123,39 @@ function createActions(runtime) {
 
   async function status(args, ctx, action = "status") {
     const owner = contextSessionId(ctx);
-    await runtime.ensureOperation(PREFIX + "status", { signal: ctx.signal });
-    const ids = selectedSessionIds(args) || store.list(owner, MAX_SELECTED_SESSIONS).map((entry) => entry.sessionId);
-    const workers = await Promise.all(ids.map((id) => readStatus(id, { signal: ctx.signal })));
-    return { action, workers: workers.map((entry) => withAcceptance(entry, owner)) };
+    await runtime.ensureOperation(PREFIX + "status", { signal: ctx?.signal });
+    const queryOwner = args?.allOwners || owner === "orchestrator-ui" ? null : owner;
+    const ids = selectedSessionIds(args) || store.list(queryOwner, MAX_SELECTED_SESSIONS).map((entry) => entry.sessionId);
+    const workers = await Promise.all(ids.map((id) => readStatus(id, { signal: ctx?.signal }).catch((err) => ({ sessionId: id, status: "error", error: String(err?.message || err) }))));
+    return { action, workers: workers.map((entry) => entry.status === "error" ? entry : withAcceptance(entry, queryOwner)) };
   }
 
   async function list(args, ctx) {
     const owner = contextSessionId(ctx);
-    await runtime.ensureOperation(PREFIX + "list", { signal: ctx.signal });
-    const value = await runtime.call("list", {}, { signal: ctx.signal });
+    await runtime.ensureOperation(PREFIX + "list", { signal: ctx?.signal });
+    const value = await runtime.call("list", {}, { signal: ctx?.signal });
     if (!value || !Array.isArray(value.sessions) || value.sessions.length > 100 || value.sessions.some((entry) => (
       !entry || typeof entry.sessionId !== "string" || !entry.sessionId ||
       typeof entry.title !== "string" || typeof entry.status !== "string"
     ))) {
       throw taskError("INTERNAL", "Host returned an invalid session directory");
     }
-    // Keep the legacy workers field for callers that used list() as a recent
-    // reference status read. The host-backed sessions field is the authority
-    // for discovering independent top-level sessions.
-    const ids = store.list(owner, MAX_SELECTED_SESSIONS).map((entry) => entry.sessionId);
-    const workers = await Promise.all(ids.map((id) => readStatus(id, { signal: ctx.signal })));
+    const queryOwner = args?.allOwners || owner === "orchestrator-ui" ? null : owner;
+    const recentIds = store.list(queryOwner, MAX_SELECTED_SESSIONS).map((entry) => entry.sessionId);
+    const activeIds = value.sessions
+      .filter((entry) => ["running", "queued", "waiting_permission"].includes(entry.status))
+      .map((entry) => entry.sessionId);
+    const ids = owner === "orchestrator-ui"
+      ? [...new Set([...recentIds, ...activeIds, ...value.sessions.map((entry) => entry.sessionId)])].slice(0, MAX_SELECTED_SESSIONS)
+      : recentIds;
+    const workers = await Promise.all(ids.map((id) => readStatus(id, { signal: ctx?.signal }).catch((err) => {
+      if (err.code === "ABORTED") throw err;
+      return { sessionId: id, status: "error", error: String(err?.message || err) };
+    })));
     return {
       action: "list",
       sessions: value.sessions,
-      workers: workers.map((entry) => withAcceptance(entry, owner)),
+      workers: workers.map((entry) => entry.status === "error" ? entry : withAcceptance(entry, queryOwner)),
     };
   }
 
@@ -305,7 +313,7 @@ function createActions(runtime) {
     }
   }
 
-  return { execute };
+  return { execute, store, runtime, readStatus, readResult };
 }
 
 
